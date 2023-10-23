@@ -1,9 +1,10 @@
 # fast5_rekindler
 
 [![PyPI](https://img.shields.io/pypi/v/fast5_rekindler?style=flat-square)](https://pypi.python.org/pypi/fast5_rekindler/)
+[![PyPi Downloads](https://img.shields.io/pypi/dm/fast5_rekindler)](https://pypistats.org/packages/fast5_rekindler)
+[![CI/CD](https://github.com/adnaniazi/fast5_rekindler/actions/workflows/release.yml/badge.svg)](https://github.com/adnaniazi/fast5_rekindler/actions/workflows/release.yml)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/fast5_rekindler?style=flat-square)](https://pypi.python.org/pypi/fast5_rekindler/)
 [![PyPI - License](https://img.shields.io/pypi/l/fast5_rekindler?style=flat-square)](https://pypi.python.org/pypi/fast5_rekindler/)
-[![Coookiecutter - Wolt](https://img.shields.io/badge/cookiecutter-Wolt-00c2e8?style=flat-square&logo=cookiecutter&logoColor=D4AA00&link=https://github.com/woltapp/wolt-python-package-cookiecutter)](https://github.com/woltapp/wolt-python-package-cookiecutter)
 
 
 ---
@@ -87,6 +88,3 @@ Or if you want e.g. want to run all checks manually for all files:
 pre-commit run --all-files
 ```
 
----
-
-This project was generated using the [wolt-python-package-cookiecutter](https://github.com/woltapp/wolt-python-package-cookiecutter) template.
