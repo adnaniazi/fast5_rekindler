@@ -1,0 +1,18 @@
+{
+  "template": "https://github.com/woltapp/wolt-python-package-cookiecutter",
+  "commit": "4eecc9c4d27e3c9321438bc1fdaf717bec5eadf6",
+  "checkout": null,
+  "context": {
+    "cookiecutter": {
+      "author_name": "Adnan M. Niazi",
+      "author_email": "adnaniazi@gmail.com",
+      "github_username": "adnaniazi",
+      "project_name": "fast5_rekindler",
+      "project_slug": "fast5_rekindler",
+      "package_name": "fast5_rekindler",
+      "project_short_description": "Collates information from BAM and POD5 files and generates FAST5 files for use in legacy tools such as tailfindr.",
+      "_template": "https://github.com/woltapp/wolt-python-package-cookiecutter"
+    }
+  },
+  "directory": null
+}
