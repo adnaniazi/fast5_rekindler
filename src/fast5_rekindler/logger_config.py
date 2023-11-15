@@ -10,6 +10,7 @@ logger = base_logger
 # Default log directory
 log_directory = "."
 
+from importlib.metadata import version
 
 def get_version() -> Any:
     """Get the version of the app from pyproject.toml.
@@ -20,8 +21,10 @@ def get_version() -> Any:
     Returns:
         app_version (Any): Version of the app.
     """
-    with open("pyproject.toml", encoding="utf-8") as file:
-        app_version = toml.load(file)["tool"]["poetry"]["version"]
+    # with open("pyproject.toml", encoding="utf-8") as file:
+    #     app_version = toml.load(file)["tool"]["poetry"]["version"]
+    app_version = version('fast5_rekindler')
+
     return app_version
 
 
