@@ -88,9 +88,8 @@ def get_total_records(bam_filepath: str) -> int:
     Returns:
         total_records (int): Total number of records in the BAM file.
     """
-    bam_file = pysam.AlignmentFile(bam_filepath)
-    total_records = sum(1 for _ in bam_file)
-    bam_file.close()
+    with pysam.AlignmentFile(bam_filepath) as bam_file:
+        total_records = sum(1 for _ in bam_file)
     return total_records
 
 
@@ -105,10 +104,14 @@ def get_signal_info(record: pysam.AlignedSegment) -> Dict[str, Any]:
     """
     signal_info = {}
     tags_dict = dict(record.tags)  # type: ignore
-    moves_table = tags_dict["mv"]
-    moves_step = moves_table.pop(0)
-    signal_info["moves_table"] = moves_table
-    signal_info["moves_step"] = moves_step
+    try:
+        signal_info["moves_table"] = tags_dict["mv"]
+    except KeyError:
+        logger.error(
+            "The BAM file does not contain moves information. Please use --emit-moves option when basecalling using Doardo."
+        )
+        raise SystemExit
+    signal_info["moves_step"] = signal_info["moves_table"].pop(0)
     signal_info["read_id"] = record.query_name
     signal_info["start_sample"] = tags_dict["ts"]
     signal_info["num_samples"] = tags_dict["ns"]
@@ -156,17 +159,18 @@ def insert_bamdata_in_db_worker(
     cursor = worker_state["db_cursor"]
 
     try:
-        block_stride = bam_data["moves_step"]  # type: ignore
-        called_events = len(bam_data["moves_table"])  # type: ignore
-        mean_qscore = bam_data["quality_score"]  # type: ignore
-        sequence_length = len(bam_data["read_fasta"])  # type: ignore
-        duration_template = bam_data["num_samples"]  # type: ignore
-        first_sample_template = bam_data["start_sample"]  # type: ignore
+        # Extract the required attributes from the BAM data dictionary
+        block_stride = bam_data.get("moves_step")  # type: ignore
+        called_events = len(bam_data.get("moves_table"))  # type: ignore
+        mean_qscore = bam_data.get("quality_score")  # type: ignore
+        sequence_length = len(bam_data.get("read_fasta"))  # type: ignore
+        duration_template = bam_data.get("num_samples")  # type: ignore
+        first_sample_template = bam_data.get("start_sample")  # type: ignore
         num_events_template = called_events
-        moves_table = bam_data["moves_table"].tobytes()  # type: ignore
-        read_fasta = bam_data["read_fasta"]  # type: ignore
-        read_quality = bam_data["read_quality"]  # type: ignore
-        read_id = bam_data["read_id"]  # type: ignore
+        moves_table = bam_data.get("moves_table").tobytes()  # type: ignore
+        read_fasta = bam_data.get("read_fasta")  # type: ignore
+        read_quality = bam_data.get("read_quality")  # type: ignore
+        read_id = bam_data.get("read_id")  # type: ignore
 
         insert_query = """INSERT OR IGNORE INTO bam_db (
                             block_stride,
