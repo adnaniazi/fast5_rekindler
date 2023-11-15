@@ -1,146 +1,187 @@
-"""
-We cannot random access a record in a BAM file. We can only iterate through it. That is our starting point.
-For each record in BAM file, we need to find the corresponding record in POD5 file. For that we need a 
-mapping between POD5 file and read_ids. 
-
-Once we have the index, we can go into the relevant POD5 file and get its signal data and collate signal
-information with Move table
-"""
-import pod5 as p5
+from ont_fast5_api.fast5_interface import get_fast5_file
 import sqlite3
 import os
-from tqdm import tqdm
-from typing import List, Tuple
-def get_readids(pod5_filepath: str) -> List[str]:
+from typing import List, Tuple, Dict, Any
+from mpire import WorkerPool
+
+# Constants
+TABLE_INIT_QUERY = '''CREATE TABLE IF NOT EXISTS index_db (
+    read_id TEXT PRIMARY KEY DEFAULT 'Unknown',
+    fast5_filepath TEXT DEFAULT 'N/A'
+)'''
+
+class DatabaseHandler:
+    """Database handler for multiprocessing."""
+    def __init__(self, output_dir: str, num_processes: int) -> None:
+        self.output_dir = output_dir
+        self.num_processes = num_processes
+
+    def init_func(self, worker_id: int, worker_state: Dict[str, Any]) -> None:
+        """Initializes the database connection for each worker."""
+        unique_db_path = os.path.join(self.output_dir, f"tmp_worker_{worker_id}.db") 
+        worker_state['db_connection'] = sqlite3.connect(unique_db_path)
+        worker_state['db_cursor'] = worker_state['db_connection'].cursor()
+        worker_state['db_cursor'].execute(TABLE_INIT_QUERY)
+        worker_state['db_connection'].commit()
+
+    def exit_func(self, worker_id: int, worker_state: Dict[str, Any]) -> None:
+        """Closes the database connection for each worker."""
+        conn = worker_state['db_connection']
+        cursor = worker_state['db_cursor']
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+    def merge_databases(self):
+        """Merges the databases from each worker into a single database."""
+        db_path = os.path.join(self.output_dir, "index_db.db") 
+        main_conn = sqlite3.connect(db_path)
+        main_cursor = main_conn.cursor()
+        main_cursor.execute(TABLE_INIT_QUERY)
+        for i in range(self.num_processes):
+            worker_db_path = os.path.join(self.output_dir, f"tmp_worker_{i}.db") 
+            main_cursor.execute(f"ATTACH DATABASE '{worker_db_path}' AS worker_db")
+            main_cursor.execute("BEGIN")
+            main_cursor.execute("""
+                INSERT OR IGNORE INTO index_db 
+                SELECT * FROM worker_db.index_db
+            """)
+            main_cursor.execute("COMMIT")
+            main_cursor.execute("DETACH DATABASE worker_db")
+            os.remove(worker_db_path)
+        main_conn.commit()
+        main_conn.close()
+
+
+def get_readids(fast5_filepath: str) -> List[str]:
     """
-    Get a list of read_ids from a POD5 file.
+    Get a list of read_ids from a FAST5 file.
     
     Params:
-        pod5_filepath (str): Path to a POD5 file.
+        fast5_filepath (str): Path to a FAST5 file.
         
     Returns:
         read_ids (List[str]): List of read_ids.
     """
-    pod5_fh = p5.Reader(pod5_filepath)
-    return pod5_fh.read_ids
-    
-def open_database(database_path: str) -> Tuple[sqlite3.Cursor, sqlite3.Connection]:
-    """
-    Open the database connection based on the database path.
-    
-    Params:
-        database_path (str): Path to the database.
-        
-    Returns:
-        cursor (sqlite3.Cursor): Cursor object for the database.
-        conn (sqlite3.Connection): Connection object for the database.
-    """
-    
-    # Connect to SQLite database (or create it if it doesn't exist)
-    conn = sqlite3.connect(database_path)
-    cursor = conn.cursor()
-    return cursor, conn
+    read_ids = []
+    with get_fast5_file(fast5_filepath, mode="r") as f5:
+        for read in f5.get_reads():
+            read_ids.append(read.read_id)
+    return read_ids
   
-def prepare_data(read_ids: List[str], pod5_filepath: str) -> List[Tuple[str, str]]:
+def prepare_data(read_ids: List[str], fast5_filepath: str) -> List[Tuple[str, str]]:
     """
-    Prepare tuples for read_id and pod_filepath for insertion into database.
+    Prepare tuples for read_id and fast5_filepath for insertion into database.
     
     Params:
         read_ids (List[str]): List of read_ids.
-        pod5_filepath (str): Path to a POD5 file.   
+        fast5_filepath (str): Path to a FAST5 file.   
         
     Returns:
-        data (List[Tuple[str, str]]): List of tuples of read_id and pod5_filepath.
+        data (List[Tuple[str, str]]): List of tuples of read_id, fast5_filepath
+        and other relevant read data.
     """
-    return [(read_id, pod5_filepath) for read_id in read_ids]
+    return [(read_id, fast5_filepath) for read_id in read_ids]
     
-def write_database(data:  List[Tuple[str, str]], cursor: sqlite3.Cursor, conn: sqlite3.Connection):
+def write_database(data: List[Tuple[str, str]], cursor: sqlite3.Cursor, conn: sqlite3.Connection):
     """
-    Write the index to a database.
+    Write the index data (read_id, filepath) to the database.
     
     Params:
-        data (List[Tuple[str, str]]): List of tuples of read_id and pod5_filepath.
+        data (List[Tuple[str, str, int, int, float, int, int, int, int]]): List of tuples read_id and filepath
         cursor (sqlite3.Cursor): Cursor object for the database.
         conn (sqlite3.Connection): Connection object for the database.
         
     Returns:
         None
     """
-
-    # Create table
-    cursor.execute('''CREATE TABLE IF NOT EXISTS data (read_id TEXT PRIMARY KEY, pod5_filepath TEXT)''')
-
-    # Insert data
-    cursor.executemany("INSERT or REPLACE INTO data VALUES (?, ?)", data)
-
-    # Commit
-    conn.commit()
+    cursor.executemany("INSERT OR IGNORE INTO index_db (read_id, fast5_filepath) VALUES (?, ?)", data)
     
-def generate_pod5_file_paths(pod5_path: str) -> str:
-    """ Traverse the directory and yield all the pod5 file paths.
+def generate_fast5_file_paths(fast5_dir: str) -> str:
+    """ Traverse the directory and yield all the fast5 file paths.
     
     Params:
-        pod5_path (str): Path to a POD5 file or directory of POD5 files.
+        fast5_dir (str): Path to a FAST5 file or directory of FAST5 files.
         
     Returns:
-        pod5_filepath (str): Path to a POD5 file.
+        pod5_filepath (str): Path to a FAST5 file.
     """
     
-    if os.path.isdir(pod5_path):
-        for root, dirs, files in os.walk(pod5_path):
+    if os.path.isdir(fast5_dir):
+        for root, dirs, files in os.walk(fast5_dir):
             for file in files:
-                if file.endswith(".pod5"):
+                if file.endswith(".fast5"):
                     yield os.path.join(root, file)
-    elif os.path.isfile(pod5_path) and pod5_path.endswith(".pod5"):
-        yield pod5_path
+    elif os.path.isfile(fast5_dir) and fast5_dir.endswith(".fast5"):
+        yield fast5_dir
 
-def find_database_size(database_path) -> int:
+def find_database_size(output_dir: str) -> int:
     """
     Find the number of records in the database.
     
     Params:
-        database_path (str): Path to the database.
+        output_dir (str): Path to the database directory.
         
     Returns:
         size (int): Number of records in the database.
     """
+    database_path = os.path.join(output_dir, "index_db.db")
     conn = sqlite3.connect(database_path)
     cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM data")
+    cursor.execute("SELECT COUNT(*) FROM index_db")
     size = cursor.fetchone()[0]
     return size
 
-    
-def index(pod5_path: str, bam_filepath: str, database_path: str) -> None:
+def build_index_db_worker(worker_id: int, worker_state: Dict[str, Any], fast5_filepath: str) -> None:
     """
-    Builds an index mapping read_ids to POD5 file paths.
+    Builds an index mapping read_ids to FAST5 file paths. Every worker has its own database.
     
     Params:
-        pod5_path (str): Path to a POD5 file or directory of POD5 files.
-        bam_filepath (str): Path to a BAM file.
-        database_path (str): Path to a database.
+        fast5_filepath (str): Path to a FAST5 file.
+        worker_id (int): Worker ID.
+        worker_state (Dict[str, Any]): Worker state dictionary.
         
     Returns:
         None
     """
+    read_ids = get_readids(fast5_filepath)
+    data = prepare_data(read_ids, fast5_filepath)
+    write_database(data, worker_state['db_cursor'], worker_state['db_connection'])
+
+def build_index_db(fast5_dir: str, output_dir: str, num_processes: int) -> None:
+    """
+    Builds an index mapping read_ids to FAST5 file paths.
     
-    cursor, conn = open_database(database_path)
+    Params:
+        fast5_dir (str): Path to a FAST5 file or directory of FAST5 files.
+        output_dir (str): Path to a output directory.
+        num_processes (int): Number of processes to use.
+        
+    Returns:
+        None
+    """
+    # Ensure output directory exists
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    total_files = sum(1 for _ in generate_fast5_file_paths(fast5_dir))
+
+    num_processes = min(num_processes, total_files)
+    db_handler = DatabaseHandler(output_dir, num_processes)
     
-    total_files = sum(1 for _ in generate_pod5_file_paths(pod5_path))
+    with WorkerPool(n_jobs=num_processes, use_worker_state=True, pass_worker_id=True) as pool:
+        pool.map(build_index_db_worker, 
+                [(fast5_filepath,) for fast5_filepath in generate_fast5_file_paths(fast5_dir)], 
+                iterable_len=total_files,
+                worker_init=db_handler.init_func,
+                worker_exit=db_handler.exit_func,
+                progress_bar=True,
+                progress_bar_options={'desc': '', 'unit': 'files', 'colour': 'green'})
+    db_handler.merge_databases()
 
-    for pod5_filepath in tqdm(generate_pod5_file_paths(pod5_path), total=total_files, desc="Processing POD5 files", unit="file"):
-        read_ids = get_readids(pod5_filepath)
-        data = prepare_data(read_ids, pod5_filepath)
-        write_database(data, cursor, conn)
 
-    conn.close()
-
-
-    
 if __name__ == "__main__":
-    bam_file = "/export/valenfs/data/processed_data/MinION/9_madcap/1_data/3_20230829_randomcap01/1_basecall/calls.bam"
-    pod5_file = "/export/valenfs/data/raw_data/minion/20230829_randomcap01/20230829_randomcap01/20230829_1511_MN21607_FAW07137_2af67808/"
-    database_path =  "/export/valenfs/data/processed_data/MinION/9_madcap/1_data/3_20230829_randomcap01/database.db"
-    index(pod5_file, bam_file, database_path)
-    print("Total number of reads", find_database_size(database_path))
-    pass
+    fast5_dir = "/export/valenfs/data/processed_data/MinION/10_tailfindr_r10/1_package_test_data/f5r_output7"
+    output_dir =  "/export/valenfs/data/processed_data/MinION/10_tailfindr_r10/1_package_test_data/f5r_output7"
+    num_processes = 5
+    build_index_db(fast5_dir, output_dir, num_processes)
+    print("Total number of reads", find_database_size(output_dir))

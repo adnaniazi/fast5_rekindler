@@ -3,15 +3,18 @@ from datetime import datetime
 import os
 import toml
 
-with open("pyproject.toml", encoding='utf-8') as file:
-    app_version = toml.load(file)["tool"]["poetry"]["version"]
-    
 # Configure the base logger
 logger = base_logger
+# Default log directory
+log_directory = '.'  
 
-log_directory = '.'  # Default log directory
-
+def get_version():
+    with open("pyproject.toml", encoding='utf-8') as file:
+        app_version = toml.load(file)["tool"]["poetry"]["version"]
+    return app_version
 def configure_logger(new_log_directory=None):
+
+    
     global log_directory  # Declare log_directory as global to modify it
     
     if new_log_directory is not None:
@@ -27,7 +30,8 @@ def configure_logger(new_log_directory=None):
     timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
 
     # Use the timestamp in the log file name
-    log_filename = f"capfinder_v{app_version}_{timestamp}.log"
+    app_version = get_version()
+    log_filename = f"fast5_rekindler_v{app_version}_{timestamp}.log"
     
     log_filepath = os.path.join(log_directory, log_filename)
 
@@ -36,7 +40,9 @@ def configure_logger(new_log_directory=None):
     logger.add(log_filepath, format="{time} {level} {message}")
 
     # Now logs will be sent to both the terminal and log_filename
-    logger.info("CAPFINDER")
+    logger.opt(depth=1).info(f'Started Fast5 Rekindler v({app_version})\n')
+    return log_filepath
     
-# Initial configuration
-configure_logger()
+if __name__ == "__main__":
+    # Initial configuration
+    configure_logger()

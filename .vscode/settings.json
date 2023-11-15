@@ -1,0 +1,8 @@
+{
+    "python.envFile": "~/micromamba/envs/fast5_rekindler311",
+    "python.testing.pytestArgs": [
+        "tests"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true
+}

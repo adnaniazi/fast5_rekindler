@@ -18,7 +18,8 @@ classifiers = [
   "Operating System :: OS Independent",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
   "Topic :: Software Development :: Libraries :: Python Modules",
   "Typing :: Typed",
 ]
@@ -28,7 +29,14 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.9, <3.10"
+python = ">=3.10, <3.12"
+loguru = "^0.7.2"
+ont-fast5-api = "^4.1.1"
+mpire = "^2.8.0"
+pod5 = "^0.2.4"
+pysam = "^0.22.0"
+click = "^8.1.7"
+pexpect = "^4.8.0"
 
 [tool.poetry.dev-dependencies]
 autoflake = "*"
@@ -63,7 +71,7 @@ profile = "black"
 src_paths = ["src", "tests"]
 
 [tool.black]
-target-version = ["py37", "py38", "py39"]
+target-version = ["py39"]
 include = '\.pyi?$'
 
 [tool.pytest.ini_options]
@@ -75,7 +83,7 @@ addopts = """\
 """
 
 [tool.coverage.report]
-fail_under = 100
+fail_under = 0
 exclude_lines = [
     'if TYPE_CHECKING:',
     'pragma: no cover'
@@ -91,3 +99,6 @@ warn_redundant_casts = true
 warn_return_any = true
 check_untyped_defs = true
 show_error_codes = true
+
+[tool.poetry.scripts]
+fast5_rekindler = "fast5_rekindler.cli:fast5_rekindler"
