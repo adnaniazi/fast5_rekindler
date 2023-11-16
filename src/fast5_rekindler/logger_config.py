@@ -1,8 +1,8 @@
 import os
 from datetime import datetime
+from importlib.metadata import version
 from typing import Any
 
-import toml
 from loguru import logger as base_logger
 
 # Configure the base logger
@@ -10,7 +10,6 @@ logger = base_logger
 # Default log directory
 log_directory = "."
 
-from importlib.metadata import version
 
 def get_version() -> Any:
     """Get the version of the app from pyproject.toml.
@@ -21,10 +20,7 @@ def get_version() -> Any:
     Returns:
         app_version (Any): Version of the app.
     """
-    # with open("pyproject.toml", encoding="utf-8") as file:
-    #     app_version = toml.load(file)["tool"]["poetry"]["version"]
-    app_version = version('fast5_rekindler')
-
+    app_version = version("fast5_rekindler")
     return app_version
 
 
@@ -64,5 +60,5 @@ def configure_logger(new_log_directory: str) -> str:
     logger.add(log_filepath, format="{time} {level} {message}")
 
     # Now logs will be sent to both the terminal and log_filename
-    logger.opt(depth=1).info(f"Started Fast5 Rekindler v({app_version})\n")
+    logger.opt(depth=1).info(f"Started FAST5 Rekindler v({app_version})\n")
     return log_filepath

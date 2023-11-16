@@ -107,7 +107,7 @@ def get_signal_info(record: pysam.AlignedSegment) -> Dict[str, Any]:
     try:
         signal_info["moves_table"] = tags_dict["mv"]
     except KeyError:
-        logger.error(
+        logger.exception(
             "The BAM file does not contain moves information. Please use --emit-moves option when basecalling using Doardo."
         )
         raise SystemExit

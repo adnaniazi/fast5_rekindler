@@ -7,8 +7,6 @@ authors = [
 ]
 license = "MIT"
 readme = "README.md"
-include = ["pyproject.toml"]
-
 documentation = "https://adnaniazi.github.io/fast5_rekindler"
 homepage = "https://adnaniazi.github.io/fast5_rekindler"
 repository = "https://github.com/adnaniazi/fast5_rekindler"
