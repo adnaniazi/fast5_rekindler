@@ -85,4 +85,4 @@ venv.bak/
 **/py.typed
 
 # ignore notebooks folder
-/src/capfinder/notebooks/
+/src/fast5_rekindler/notebooks/
