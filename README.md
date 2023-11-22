@@ -22,15 +22,15 @@ Collates information from BAM and POD5 files and generates FAST5 files for use i
 ## Installation
 
 1\. Create Python 3.10 or 3.11 environment.
-  
+
  ```bash
  conda create -n f5r python=3.11
  ```
- 
+
 2\. Activate the environment.
 
  ```bash
- conda activate f5r 
+ conda activate f5r
  ```
 
 3\. Install FAST5 Rekindler.

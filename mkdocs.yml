@@ -32,5 +32,3 @@ plugins:
             show_signature_annotations: true
             show_source: true
             show_submodules: true
-      watch:
-        - src/fast5_rekindler

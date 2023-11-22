@@ -1,3 +1,3 @@
 # API documentation
 
-:::fast5_rekindler
+::: src.fast5_rekindler.bam
