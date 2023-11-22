@@ -14,9 +14,6 @@ log_directory = "."
 def get_version() -> Any:
     """Get the version of the app from pyproject.toml.
 
-    Params:
-        None
-
     Returns:
         app_version (Any): Version of the app.
     """
