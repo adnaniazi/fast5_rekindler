@@ -21,8 +21,58 @@ Collates information from BAM and POD5 files and generates FAST5 files for use i
 
 ## Installation
 
+1\. Create Python 3.10 or 3.11 environment.
+  
+ ```bash
+ conda create -n f5r python=3.11
+ ```
+ 
+2\. Activate the environment.
+
+ ```bash
+ conda activate f5r 
+ ```
+
+3\. Install FAST5 Rekindler.
+
+ ```bash
+ pip install fast5_rekindler
+ ```
+
+## Usage
+FAST5 rekindler needs:
+
+1\. A BAM file with `moves` table in it.
+
+You can generate it using Dorado:
 ```sh
-pip install fast5_rekindler
+dorado basecaller /path/to/basecalling/model \
+  /pod5/dir/path \
+  --recursive  \
+  --emit-sam  \
+  --emit-moves  \
+  --device "cpu"  \ # or "cuda:all"
+  --reference /path/to/alginment/reference > /path/to/calls.sam
+```
+
+2\. Convert Doarado's output SAM file to a BAM file
+```sh
+samtools view -bS /path/to/calls.sam > /path/to/calls.bam
+```
+
+3\. Use FAST5 Rekindler to convert POD5 files to FAST5 files
+
+```sh
+fast5_rekindler /path/to/calls.bam  \
+  /path/to/pod5_dir \
+  /path/to/output_dir \
+  --num_processes 100
+```
+
+To invoke help for FAST5 Rekindler, just type:
+
+```sh
+fast5_rekindler --help
 ```
 
 ## Development
