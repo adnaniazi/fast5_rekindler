@@ -12,7 +12,7 @@ from mpire import WorkerPool  # type: ignore
 
 TABLE_INIT_QUERY = """CREATE TABLE IF NOT EXISTS bam_db (
                                             read_id TEXT PRIMARY KEY DEFAULT 'Unknown',
-                                            fast5_filepath TEXT DEFAULT 'N/A',
+                                            parent_read_id TEXT DEFAULT 'NULL',
                                             block_stride INTEGER DEFAULT 0,
                                             called_events INTEGER DEFAULT 0,
                                             mean_qscore FLOAT DEFAULT 0.0,
@@ -22,8 +22,11 @@ TABLE_INIT_QUERY = """CREATE TABLE IF NOT EXISTS bam_db (
                                             num_events_template INTEGER DEFAULT 0,
                                             moves_table BLOB DEFAULT NULL,
                                             read_fasta TEXT DEFAULT 'N/A',
-                                            read_quality TEXT DEFAULT 'N/A'
-                                             )"""
+                                            read_quality TEXT DEFAULT 'N/A',
+                                            action TEXT DEFAULT 'N/A',
+                                            split_point INTEGER DEFAULT 0, -- split point without quotes is a reserved keyword
+                                            time_stamp TIMESTAMP DEFAULT NULL
+                                            )"""
 
 
 class DatabaseHandler:
@@ -128,6 +131,10 @@ def get_signal_info(record: pysam.AlignedSegment) -> Dict[str, Any]:
     signal_info["read_quality"] = record.qual  # type: ignore
     signal_info["read_fasta"] = record.query_sequence
     signal_info["mapping_quality"] = record.mapping_quality
+    signal_info["parent_read_id"] = tags_dict.get("pi", "")
+    signal_info["split_point"] = tags_dict.get("sp", 0)
+    signal_info["time_stamp"] = tags_dict.get("st")
+
     return signal_info
 
 
@@ -153,24 +160,43 @@ def process_bam_records(bam_filepath: str) -> Generator[Dict[str, Any], None, No
 
 
 def insert_bamdata_in_db_worker(
-    worker_id: int, worker_state: Dict[str, Any], bam_data: pysam.AlignedSegment
+    worker_id: int, worker_state: Dict[str, Any], bam_data: Dict[str, Any]
 ) -> None:
-    worker_state["db_connection"]
+    """Inserts the signal information from a BAM record into the BAM database.
+
+    Params:
+        worker_id (int): Worker ID.
+        worker_state (Dict[str, Any]): Worker state.
+        bam_data (Dict[str, Any]): A dictionary containing the signal information.
+
+    Returns:
+        None
+    """
     cursor = worker_state["db_cursor"]
+    if bam_data.get("is_secondary"):
+        # Skip supplementary alignments as they do not contain FASTA information
+        # The FASTA information is only present in the primary alignment
+        # and is picked up from these record of the primary alignment
+        return
 
     try:
         # Extract the required attributes from the BAM data dictionary
-        block_stride = bam_data.get("moves_step")  # type: ignore
-        called_events = len(bam_data.get("moves_table"))  # type: ignore
-        mean_qscore = bam_data.get("quality_score")  # type: ignore
-        sequence_length = len(bam_data.get("read_fasta"))  # type: ignore
-        duration_template = bam_data.get("num_samples")  # type: ignore
-        first_sample_template = bam_data.get("start_sample")  # type: ignore
+        block_stride = bam_data.get("moves_step")
+        moves_table = bam_data.get("moves_table")
+        called_events = len(moves_table) if moves_table is not None else 0
+        mean_qscore = bam_data.get("quality_score")
+        read_fasta = bam_data.get("read_fasta")
+        sequence_length = len(read_fasta) if read_fasta is not None else 0
+        duration_template = bam_data.get("num_samples")
+        first_sample_template = bam_data.get("start_sample")
         num_events_template = called_events
         moves_table = bam_data.get("moves_table").tobytes()  # type: ignore
-        read_fasta = bam_data.get("read_fasta")  # type: ignore
-        read_quality = bam_data.get("read_quality")  # type: ignore
-        read_id = bam_data.get("read_id")  # type: ignore
+        read_fasta = bam_data.get("read_fasta")
+        read_quality = bam_data.get("read_quality")
+        read_id = bam_data.get("read_id")
+        parent_read_id = bam_data.get("parent_read_id")
+        split_point = bam_data.get("split_point")
+        time_stamp = bam_data.get("time_stamp")
 
         insert_query = """INSERT OR IGNORE INTO bam_db (
                             block_stride,
@@ -183,8 +209,11 @@ def insert_bamdata_in_db_worker(
                             moves_table,
                             read_fasta,
                             read_quality,
-                            read_id
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+                            read_id,
+                            parent_read_id,
+                            split_point,
+                            time_stamp
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
 
         cursor.execute(
             insert_query,
@@ -200,6 +229,9 @@ def insert_bamdata_in_db_worker(
                 read_fasta,
                 read_quality,
                 read_id,
+                parent_read_id,
+                split_point,
+                time_stamp,
             ),
         )
     except Exception:
@@ -209,6 +241,16 @@ def insert_bamdata_in_db_worker(
 
 
 def build_bam_db(bam_filepath: str, output_dir: str, num_processes: int) -> None:
+    """Builds a database from a BAM file.
+
+    Params:
+        bam_filepath (str): Path to the BAM file.
+        output_dir (str): Path to the output directory.
+        num_processes (int): Number of processes to use.
+
+    Returns:
+        None
+    """
     num_bam_records = get_total_records(bam_filepath)
     db_handler = DatabaseHandler(output_dir, num_processes)
     with WorkerPool(

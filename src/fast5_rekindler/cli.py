@@ -96,4 +96,7 @@ fast5_rekindler /path/to/calls.bam /path/to/pod5_dir /path/to/output_dir -n 4
 if __name__ == "__main__":
     """CLI call example:
     fast5_rekindler /export/valenfs/data/processed_data/MinION/10_tailfindr_r10/1_package_test_data/2_bam_file/calls.bam /export/valenfs/data/processed_data/MinION/10_tailfindr_r10/1_package_test_data/0_pod5 /export/valenfs/data/processed_data/MinION/10_tailfindr_r10/1_package_test_data/f5r_output16 -n 100
+
+    fast5_rekindler /export/valenfs/data/processed_data/MinION/10_tailfindr_r10/oguz_data/inputs/test.sorted.bam /export/valenfs/data/processed_data/MinION/10_tailfindr_r10/oguz_data/inputs/pod5/ /export/valenfs/data/processed_data/MinION/10_tailfindr_r10/oguz_data/output -n 100
+
     """
