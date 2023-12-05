@@ -55,15 +55,20 @@ dorado basecaller /path/to/basecalling/model \
   --reference /path/to/alginment/reference > /path/to/calls.sam
 ```
 
-2\. Convert Doarado's output SAM file to a BAM file
+2\. Convert Doarado's output SAM file to a BAM file.
 ```sh
 samtools view -bS /path/to/calls.sam > /path/to/calls.bam
 ```
 
-3\. Use FAST5 Rekindler to convert POD5 files to FAST5 files
+3\. Sort the BAM file.
+```sh
+samtools sort /path/to/calls.bam -o /path/to/sorted.calls.bam
+```
+
+4\. Use FAST5 Rekindler to convert POD5 files to FAST5 files.
 
 ```sh
-fast5_rekindler /path/to/calls.bam  \
+fast5_rekindler /path/to/sorted.calls.bam  \
   /path/to/pod5_dir \
   /path/to/output_dir \
   --num_processes 100
