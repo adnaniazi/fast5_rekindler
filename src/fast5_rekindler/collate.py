@@ -502,7 +502,7 @@ def add_info_to_fast5_read(f5_read: Any, data: Dict[str, Any], read_id: str) -> 
     )
     f5_read.add_analysis_subgroup(
         group_name="Basecall_1D_000/Summary",
-        subgroup_name="basecall_1d_summary",
+        subgroup_name="basecall_1d_template",
         attrs={
             "block_stride": data["block_stride"],
             "called_events": data["called_events"],
