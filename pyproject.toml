@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "fast5_rekindler"
-version = "0.0.3"
+version = "0.0.4"
 description = "Collates information from BAM and POD5 files and generates FAST5 files for use in legacy tools such as tailfindr."
 authors = [
     "Adnan M. Niazi <adnaniazi@gmail.com>",
