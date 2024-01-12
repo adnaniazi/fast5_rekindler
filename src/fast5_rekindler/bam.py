@@ -61,22 +61,33 @@ class DatabaseHandler:
 
         main_cursor.execute(TABLE_INIT_QUERY)
 
-        for i in range(self.num_processes):
-            worker_db_path = os.path.join(self.output_dir, f"tmp_worker_{i}.db")
-            main_cursor.execute(f"ATTACH DATABASE '{worker_db_path}' AS worker_db")
+        try:
+            for i in range(self.num_processes):
+                worker_db_path = os.path.join(self.output_dir, f"tmp_worker_{i}.db")
+                
+                try:
+                    main_cursor.execute(f"ATTACH DATABASE '{worker_db_path}' AS worker_db")
+                    main_cursor.execute("BEGIN")
 
-            main_cursor.execute("BEGIN")
+                    main_cursor.execute(
+                        """
+                        INSERT OR IGNORE INTO bam_db
+                        SELECT * FROM worker_db.bam_db
+                        """
+                    )
 
-            main_cursor.execute(
-                """
-                INSERT OR IGNORE INTO bam_db
-                SELECT * FROM worker_db.bam_db
-            """
-            )
+                    main_cursor.execute("COMMIT")
 
-            main_cursor.execute("COMMIT")
-            main_cursor.execute("DETACH DATABASE worker_db")
-            os.remove(worker_db_path)
+                except Exception as e:
+                    logger.warning(f"Error processing worker BAM databse {i}: {str(e)}. May be an empty database. Nothing to worry about.")
+
+                finally:
+                    main_cursor.execute("DETACH DATABASE worker_db")
+                    os.remove(worker_db_path)
+
+        finally:
+            main_cursor.close()
+            main_conn.close()
 
         main_conn.commit()
         main_conn.close()
@@ -269,7 +280,7 @@ def build_bam_db(bam_filepath: str, output_dir: str, num_processes: int) -> None
 
 
 if __name__ == "__main__":
-    bam_filepath = "/export/valenfs/data/processed_data/MinION/10_tailfindr_r10/1_package_test_data/2_bam_file/calls.bam"
-    output_dir = "/export/valenfs/data/processed_data/MinION/10_tailfindr_r10/1_package_test_data/f5r_output7/"
-    num_processes = 10
+    bam_filepath = "/export/valenfs/data/processed_data/MinION/10_tailfindr_r10/oguz_debug/Nano3Pseq_R10.sorted.bam"
+    output_dir = "/export/valenfs/data/processed_data/MinION/10_tailfindr_r10/oguz_debug/output/"
+    num_processes = 120
     build_bam_db(bam_filepath, output_dir, num_processes)
