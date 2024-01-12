@@ -58,7 +58,7 @@ class DatabaseHandler:
         db_path = os.path.join(self.output_dir, "bam_db.db")
         main_conn = sqlite3.connect(db_path)
         main_cursor = main_conn.cursor()
-
+        logger.info("Merging databases from each worker into a single database...")
         main_cursor.execute(TABLE_INIT_QUERY)
 
         try:
@@ -82,7 +82,7 @@ class DatabaseHandler:
 
                 except Exception:
                     logger.warning(
-                        "Error processing worker BAM database %d. May be an empty database. Nothing to worry about.",
+                        "May be an empty database # {}. Nothing to worry about.",
                         i,
                     )
 
@@ -93,9 +93,7 @@ class DatabaseHandler:
         finally:
             main_cursor.close()
             main_conn.close()
-
-        main_conn.commit()
-        main_conn.close()
+            logger.info("Merging databases complete.")
 
 
 def get_total_records(bam_filepath: str) -> int:
